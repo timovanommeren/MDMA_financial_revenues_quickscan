@@ -1,0 +1,50 @@
+---
+title: "MDMA_financial_revenues_quickscan"
+output: html_document
+date: "2025-08-26"
+---
+
+```{r estimates}
+
+number_consumers <- 550000
+frequency_use <- c()
+intensity_use <- 2
+market_capture_rate <- 0.8
+price <- 4.5
+
+```
+
+
+## Variables
+
+```{r frequency of use}
+
+party_panel <- read.csv("Party_Panel.csv") 
+party_panel <- party_panel[-27,] # remove final row with summed rows
+party_panel <- as.data.frame(apply(party_panel, 2, as.numeric))
+
+frequency_use <- with(party_panel, sum(Gebruik * Frequencies) / sum(Frequencies))
+
+frequency_var  <- with(party_panel,
+                  sum(Frequencies * (Gebruik - frequency_use)^2) /
+                  (sum(Frequencies) - 1) ) 
+
+frequency_sd   <- sqrt(frequency_var)
+
+```
+
+```{r}
+
+```
+
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
