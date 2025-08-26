@@ -7,10 +7,25 @@ date: "2025-08-26"
 ```{r estimates}
 
 number_consumers <- 550000
-frequency_use <- c()
-intensity_use <- 2
-market_capture_rate <- 0.8
-price <- 4.5
+
+# assumed normal distribution
+intensity_mean <- 2
+intensity_sd <- 0.5
+
+# assumed uniform distribution
+mkr_estimate <- 0.8
+mkr_lower <- 0.4
+mkr_upper <- 0.9
+
+# assumed uniform distribution
+price_estimate <- 4.5
+price_lower <- 3
+price_upper <- 8
+
+# assumed uniform distribution
+cost_estimate <- 1.5
+cost_lower <- 1
+cost_upper <- 5
 
 ```
 
@@ -20,31 +35,66 @@ price <- 4.5
 ```{r frequency of use}
 
 party_panel <- read.csv("Party_Panel.csv") 
-party_panel <- party_panel[-27,] # remove final row with summed rows
+party_panel <- party_panel[-27,] # remove final five rows with single responses of frequencies above 30 times per year (lead to biased results)
 party_panel <- as.data.frame(apply(party_panel, 2, as.numeric))
 
-frequency_use <- with(party_panel, sum(Gebruik * Frequencies) / sum(Frequencies))
 
-frequency_var  <- with(party_panel,
-                  sum(Frequencies * (Gebruik - frequency_use)^2) /
-                  (sum(Frequencies) - 1) ) 
 
-frequency_sd   <- sqrt(frequency_var)
+frequency_mean <- with(party_panel, sum(Gebruik * Frequencies) / sum(Frequencies))
 
 ```
 
 ```{r}
 
+intensity <- rnorm(10000, intensity_mean, intensity_sd) # normal distribution around mean
+
+market_capture_rate <- runif(10000, mkr_lower, mkr_upper) # uniform from lower to upper
+
+costs <- runif(10000, cost_lower, cost_upper)
+
+prices <- runif(10000, price_lower, price_upper)
+
 ```
 
 
 
-## Including Plots
 
-You can also embed plots, for example:
+```{r}
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+revenue <- replicate(10000, {
+  freq   <- sample(party_panel[, 1], 1, prob = party_panel[, 3])
+  inte   <- sample(intensity, 1)
+  market <- sample(market_capture_rate, 1)
+  price  <- sample(prices, 1)
+  cost   <- sample(costs, 1)
+  
+  number_consumers * freq * inte * market * (price - cost)
+  
+})
+
+revenue_estimate <- number_consumers * frequency_mean * intensity_mean * mkr_estimate * (price_estimate - cost_estimate)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+library(ggplot2)
+library(scales)
+
+ggplot(data.frame(revenue), aes(x = "", y = revenue)) +
+  geom_boxplot(width = 0.5, outlier.shape = NA, fill = "grey90") +
+  coord_cartesian(ylim = quantile(revenue, c(.01, .90))) +
+  labs(
+    title = "Annual Revenue of a MDMA State-Monopoly",
+    x = NULL, y = "Revenue"
+  ) +
+  scale_y_continuous(labels = label_number(prefix = "€")) +
+  theme_minimal(base_size = 13) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  geom_hline(yintercept = revenue_estimate, color = "red", linewidth = 1, linetype = "solid")
+
+
+```
