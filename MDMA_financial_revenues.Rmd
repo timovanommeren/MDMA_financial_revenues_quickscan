@@ -18,12 +18,12 @@ mkr_lower <- 0.4
 mkr_upper <- 0.9
 
 # assumed uniform distribution
-price_estimate <- 4.5
+price_estimate <- 5
 price_lower <- 3
 price_upper <- 8
 
 # assumed uniform distribution
-cost_estimate <- 1.5
+cost_estimate <- 2
 cost_lower <- 1
 cost_upper <- 5
 
@@ -45,6 +45,7 @@ frequency_mean <- with(party_panel, sum(Gebruik * Frequencies) / sum(Frequencies
 ```
 
 ```{r}
+set.seed(1234)
 
 intensity <- rnorm(10000, intensity_mean, intensity_sd) # normal distribution around mean
 
@@ -57,11 +58,11 @@ prices <- runif(10000, price_lower, price_upper)
 ```
 
 
-
-
 ```{r}
+set.seed(1234)
 
 revenue <- replicate(10000, {
+  
   freq   <- sample(party_panel[, 1], 1, prob = party_panel[, 3])
   inte   <- sample(intensity, 1)
   market <- sample(market_capture_rate, 1)
@@ -82,7 +83,7 @@ library(scales)
 
 ggplot(data.frame(revenue), aes(x = "", y = revenue)) +
   geom_boxplot(width = 0.5, outlier.shape = NA, fill = "grey90") +
-  coord_cartesian(ylim = quantile(revenue, c(.01, .90))) +
+  coord_cartesian(ylim = quantile(revenue, c(0, 1))) +
   labs(
     title = "Annual Revenue of a MDMA State-Monopoly",
     x = NULL, y = "Revenue"
@@ -90,11 +91,88 @@ ggplot(data.frame(revenue), aes(x = "", y = revenue)) +
   scale_y_continuous(labels = label_number(prefix = "€")) +
   theme_minimal(base_size = 13) +
   theme(
+    plot.background  = element_rect(fill = "white", color = NA),
     panel.grid.major.x = element_blank(),
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank()
   ) +
   geom_hline(yintercept = revenue_estimate, color = "red", linewidth = 1, linetype = "solid")
 
+```
+
+```{r}
+library(ggplot2)
+library(scales)
+library(ggtext)
+
+ggplot(data.frame(revenue), aes(x = "", y = revenue)) +
+  geom_boxplot(aes(fill = "Estimated \nvariation in \nannual revenue \n(1st–90th percentile)"),
+               width = 0.5, outlier.shape = NA) +
+  coord_cartesian(ylim = quantile(revenue, c(0.01, 0.90))) +
+  labs(
+    title = "Projected Annual Revenue of a State MDMA Monopoly",
+    x = NULL, y = "Revenue"
+  ) +
+  scale_y_continuous(labels = label_number(prefix = "€")) +
+  geom_hline(aes(yintercept = revenue_estimate, color = "Estimated \nlong-term \nannual revenue"),
+             linewidth = 1) +
+  scale_fill_manual(values = c("Estimated \nvariation in \nannual revenue \n(1st–90th percentile)" = "grey90"), name = NULL) +
+  scale_color_manual(values = c("Estimated \nlong-term \nannual revenue" = "blue"), name = NULL) +
+  guides(
+    color = guide_legend(order = 1, override.aes = list(linetype = "solid", linewidth = 1)),
+    fill  = guide_legend(order = 2)
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.background  = element_rect(fill = "white", color = NA),
+    panel.grid.major.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
 
 ```
+
+```{r}
+library(ggplot2)
+library(scales)
+library(ggtext)
+
+ggplot(data.frame(revenue), aes(x = "", y = revenue)) +
+  geom_boxplot(aes(fill = "Estimated variation in annual revenue (1st–90th percentile)"),
+               width = 0.5, outlier.shape = NA) +
+  coord_cartesian(ylim = quantile(revenue, c(0.01, 0.90))) +
+  labs(
+    title = "Projected Annual Revenue of a State MDMA Monopoly",
+    x = NULL, y = "Revenue"
+  ) +
+  scale_y_continuous(labels = label_number(prefix = "€")) +
+  geom_segment(data = data.frame(y = revenue_estimate),
+               aes(x = 0.75, xend = 1.25, 
+                 y = revenue_estimate, yend = revenue_estimate, 
+                 color = "Estimated long-term annual revenue"),
+             linewidth = 1) +
+  scale_fill_manual(
+    values = c("Estimated variation in annual revenue (1st–90th percentile)" = "grey90"),
+    labels = c(
+      "Estimated variation in annual revenue (1st–90th percentile)" =
+        "Estimated variation in annual revenue <br><span style='color:grey50'>(1st–90th percentile)</span>"
+    ),
+    name = NULL
+  ) +
+  scale_color_manual(values = c("Estimated long-term annual revenue" = "blue"), name = NULL) +
+  guides(
+    color = guide_legend(order = 1, override.aes = list(linetype = "solid", linewidth = 1)),
+    fill  = guide_legend(order = 2)
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.background  = element_rect(fill = "white", color = NA),
+    panel.grid.major.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "bottom",
+    legend.text = element_markdown()
+  )
+
+```
+
