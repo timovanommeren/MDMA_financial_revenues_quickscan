@@ -106,38 +106,6 @@ library(scales)
 library(ggtext)
 
 ggplot(data.frame(revenue), aes(x = "", y = revenue)) +
-  geom_boxplot(aes(fill = "Estimated \nvariation in \nannual revenue \n(1st–90th percentile)"),
-               width = 0.5, outlier.shape = NA) +
-  coord_cartesian(ylim = quantile(revenue, c(0.01, 0.90))) +
-  labs(
-    title = "Projected Annual Revenue of a State MDMA Monopoly",
-    x = NULL, y = "Revenue"
-  ) +
-  scale_y_continuous(labels = label_number(prefix = "€")) +
-  geom_hline(aes(yintercept = revenue_estimate, color = "Estimated \nlong-term \nannual revenue"),
-             linewidth = 1) +
-  scale_fill_manual(values = c("Estimated \nvariation in \nannual revenue \n(1st–90th percentile)" = "grey90"), name = NULL) +
-  scale_color_manual(values = c("Estimated \nlong-term \nannual revenue" = "blue"), name = NULL) +
-  guides(
-    color = guide_legend(order = 1, override.aes = list(linetype = "solid", linewidth = 1)),
-    fill  = guide_legend(order = 2)
-  ) +
-  theme_minimal(base_size = 13) +
-  theme(
-    plot.background  = element_rect(fill = "white", color = NA),
-    panel.grid.major.x = element_blank(),
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank()
-  )
-
-```
-
-```{r}
-library(ggplot2)
-library(scales)
-library(ggtext)
-
-ggplot(data.frame(revenue), aes(x = "", y = revenue)) +
   geom_boxplot(aes(fill = "Estimated variation in annual revenue (1st–90th percentile)"),
                width = 0.5, outlier.shape = NA) +
   coord_cartesian(ylim = quantile(revenue, c(0.01, 0.90))) +
