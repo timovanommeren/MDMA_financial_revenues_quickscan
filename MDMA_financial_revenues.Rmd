@@ -25,7 +25,7 @@ price_upper <- 8
 # assumed uniform distribution
 cost_estimate <- 2
 cost_lower <- 1
-cost_upper <- 5
+cost_upper <- 10
 
 ```
 
@@ -106,9 +106,9 @@ library(scales)
 library(ggtext)
 
 ggplot(data.frame(revenue), aes(x = "", y = revenue)) +
-  geom_boxplot(aes(fill = "Estimated variation in annual revenue (1st–90th percentile)"),
+  geom_boxplot(aes(fill = "Estimated variation in annual revenue (5st–95th percentile)"),
                width = 0.5, outlier.shape = NA) +
-  coord_cartesian(ylim = quantile(revenue, c(0.01, 0.90))) +
+  coord_cartesian(ylim = quantile(revenue, c(0.05, 0.95))) +
   labs(
     title = "Projected Annual Revenue of a State MDMA Monopoly",
     x = NULL, y = "Revenue"
@@ -120,10 +120,10 @@ ggplot(data.frame(revenue), aes(x = "", y = revenue)) +
                  color = "Estimated long-term annual revenue"),
              linewidth = 1) +
   scale_fill_manual(
-    values = c("Estimated variation in annual revenue (1st–90th percentile)" = "grey90"),
+    values = c("Estimated variation in annual revenue (5st–95th percentile)" = "grey90"),
     labels = c(
-      "Estimated variation in annual revenue (1st–90th percentile)" =
-        "Estimated variation in annual revenue <br><span style='color:grey50'>(1st–90th percentile)</span>"
+      "Estimated variation in annual revenue (5st–95th percentile)" =
+        "Estimated variation in annual revenue <br><span style='color:grey50'>(5st–95th percentile)</span>"
     ),
     name = NULL
   ) +
