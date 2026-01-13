@@ -36,30 +36,62 @@ ui <- page_navbar(
   nav_panel(
     "Assumptions",
     layout_sidebar(
+      
       sidebar = sidebar(
         title = "Estimates",
         open = TRUE,            # keep sidebar open by default
         width = 360,            # tweak to taste
-        # --- Inputs (moved here) ---
-        h5("Intensity"),
-        p(class = "text-muted small", "Average number of pills per session."),
-        numericInput("intensity_mean", "Mean pills per session (μ)", value = 2, min = 0, step = 0.1),
-        numericInput("intensity_sd",   "Spread (sd)",               value = 0.5, min = 0, step = 0.1),
         
-        hr(),
-        h5("Market capture"),
-        p(class = "text-muted small", "Proportion of consumers who switch to the regulated market."),
-        numericInput("mkr_point", "Point estimate", value = 0.8, min = 0, max = 1, step = 0.01),
-        sliderInput("mkr_range", "Range", min = 0, max = 1, value = c(0.4, 0.9), step = 0.01),
+        accordion(
+          id = "assumption_panels", 
+          multiple = FALSE,      # only one panel open at a time
+          open = c("Simulation settings"),  # default open panels
         
-        hr(),
-        h5("Price & Cost (€/pill)"),
-        p(class = "text-muted small", "Cost is total marginal cost per pill."),
-        numericInput("price_point", "Price point estimate", value = 5, min = 0, step = 0.1),
-        sliderInput("price_range", "Price range", min = 0, max = 20, value = c(3, 8), step = 0.1),
-        numericInput("cost_point", "Cost point estimate", value = 2, min = 0, step = 0.1),
-        sliderInput("cost_range", "Cost range", min = 0, max = 20, value = c(1, 8), step = 0.1)
-      ),
+          # --- Inputs ---
+          accordion_panel(
+            "Number of consumers",
+            p(class = "text-muted small", "Estimated number of annual MDMA consumers in the Netherlands."),
+            numericInput("num_consumers", "Number of consumers", value = 550000, min = 0, step = 1000),
+            sliderInput("num_consumers_range", "Range", min = 0, max = 18000000, value = c(300000, 800000), step = 1000)
+          ),
+          
+          accordion_panel(
+          "Intensity",
+          p(class = "text-muted small", "Average number of pills per session."),
+          numericInput("intensity_mean", "Mean pills per session (μ)", value = 2, min = 0, step = 0.1),
+          numericInput("intensity_sd",   "Spread (sd)",               value = 0.5, min = 0, step = 0.1),
+          ),
+          
+          accordion_panel(
+          "Market capture",
+          p(class = "text-muted small", "Proportion of consumers who switch to the regulated market."),
+          numericInput("mkr_point", "Point estimate", value = 0.8, min = 0, max = 1, step = 0.01),
+          sliderInput("mkr_range", "Range", min = 0, max = 1, value = c(0.4, 0.9), step = 0.01),
+          ),
+          
+          accordion_panel(
+          "Price & Cost (€/pill)",
+          p(class = "text-muted small", "Cost is total marginal cost per pill."),
+          numericInput("price_point", "Price point estimate", value = 5, min = 0, step = 0.1),
+          sliderInput("price_range", "Price range", min = 0, max = 20, value = c(3, 8), step = 0.1),
+          numericInput("cost_point", "Cost point estimate", value = 2, min = 0, step = 0.1),
+          sliderInput("cost_range", "Cost range", min = 0, max = 20, value = c(1, 8), step = 0.1)
+          ),
+          
+          accordion_panel(
+            "Simulation settings",
+            h6(class = "text-muted", "Control Monte Carlo sampling."),
+            numericInput(
+              "sim_n", "Number of draws (n)",
+              value = 10000, min = 100, max = 1e6, step = 1000
+            ),
+            numericInput(
+              "sim_seed", "Random seed",
+              value = 1234, min = 0, step = 1
+            ),
+            helpText("Larger n gives smoother plots but takes longer to compute.")
+          )
+        ),
       
       
       # ---- Main content (outputs) ----
@@ -67,9 +99,10 @@ ui <- page_navbar(
         card_header("Point estimate (using point inputs)"),
         h1(textOutput("point_estimate"), class = "display-5"),
         p(class = "text-muted small",
-          "Revenue = Number of consumers × Intensity × Market capture × (Price − Cost)."
+          "Revenue = Number of consumers × Frequency x Intensity × Market capture × (Price − Cost)."
         )
-      ),
+      )
+    ),
       
       # ---- Simulation results ----
       card(
@@ -130,8 +163,11 @@ server <- function(input, output, session) {
   
   # ---- Monte Carlo simulation (reactive) ----
   sim_draws <- reactive({
-    n <- 10000L
-    set.seed(1234)  # we can make this user-set later
+    
+    n <- as.integer(max(100, min(1e6, input$sim_n %||% 10000)))
+    seed <- as.integer(input$sim_seed %||% 1234)
+    
+    set.seed(seed)  # we can make this user-set later
     
     # Inputs
     inten_mean <- max(0, input$intensity_mean)
