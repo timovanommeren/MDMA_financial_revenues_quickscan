@@ -170,7 +170,7 @@ server <- function(input, output, session) {
   })
   
   # Import empirical frequency 
-  party_panel <- read.csv("data/Party_Panel.csv", check.names = FALSE)
+  party_panel <- read.csv("Party_Panel.csv", check.names = FALSE)
   
   # drop the last five rows (your comment says five, not one)
   if (nrow(party_panel) >= 5) {
