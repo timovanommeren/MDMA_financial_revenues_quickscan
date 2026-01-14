@@ -5,6 +5,8 @@ library(here)
 library(ggplot2)
 library(scales)
 library(shinyjs)
+library(shinylive)
+library(httpuv)
 
 # Define UI for application that draws a histogram
 ui <- page_navbar(
@@ -75,7 +77,7 @@ ui <- page_navbar(
             # Manual inputs (visible always; disabled when 'use_empirical' is TRUE)
             numericInput(
               "freq_point", "Point estimate (sessions/year)",
-              value =  round(frequency_mean, 1), min = 0, step = 0.5
+              value =  round(4.7, 1), min = 0, step = 0.5
             ),
             sliderInput(
               "freq_range", "Range (sessions/year)",
