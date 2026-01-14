@@ -2,11 +2,15 @@
 library(shiny)
 library(bslib)
 library(here)
+library(ggplot2)
+library(scales)
+library(shinyjs)
 
 # Define UI for application that draws a histogram
 ui <- page_navbar(
   title = "Estimating MDMA Monopoly Revenues",
   theme = bs_theme(version = 5),
+  useShinyjs(),
   
   nav_panel(
     "About",
@@ -42,12 +46,19 @@ ui <- page_navbar(
         open = TRUE,            # keep sidebar open by default
         width = 360,            # tweak to taste
         
+        # subtitle under the title
+        div(class = "small text-muted mb-3",
+            "There is an open field and a slider for each variable below. Enter your best guess in the open fields to produce the number below. The sliders allow you to set a range and generate multiple simulated outcomes. These are shown in the figure on the right."
+        ),
+        # add space around subtitle
+        tags$hr(class = "my-2"),
+        
         accordion(
           id = "assumption_panels", 
           multiple = FALSE,      # only one panel open at a time
           open = c("Simulation settings"),  # default open panels
         
-          # --- Inputs ---
+          # --- Number of consumers ---
           accordion_panel(
             "Number of consumers",
             p(class = "text-muted small", "Estimated number of annual MDMA consumers in the Netherlands."),
@@ -55,6 +66,25 @@ ui <- page_navbar(
             sliderInput("num_consumers_range", "Range", min = 0, max = 18000000, value = c(300000, 800000), step = 1000)
           ),
           
+          # --- Frequency ---
+          accordion_panel(
+            "Frequency",
+            h6(class = "text-muted", "Annual sessions per consumer."),
+            checkboxInput("use_empirical", "Use empirical data from Party Panel", value = TRUE),
+            
+            # Manual inputs (visible always; disabled when 'use_empirical' is TRUE)
+            numericInput(
+              "freq_point", "Point estimate (sessions/year)",
+              value =  round(frequency_mean, 1), min = 0, step = 0.5
+            ),
+            sliderInput(
+              "freq_range", "Range (sessions/year)",
+              min = 0, max = 100, value = c(1, 30), step = 1
+            ),
+            helpText("When empirical data is selected, the manual controls are shown but disabled.")
+          ),
+          
+          # --- Intensity ---
           accordion_panel(
           "Intensity",
           p(class = "text-muted small", "Average number of pills per session."),
@@ -62,6 +92,7 @@ ui <- page_navbar(
           numericInput("intensity_sd",   "Spread (sd)",               value = 0.5, min = 0, step = 0.1),
           ),
           
+          #--- Market capture ---
           accordion_panel(
           "Market capture",
           p(class = "text-muted small", "Proportion of consumers who switch to the regulated market."),
@@ -69,6 +100,7 @@ ui <- page_navbar(
           sliderInput("mkr_range", "Range", min = 0, max = 1, value = c(0.4, 0.9), step = 0.01),
           ),
           
+          # --- Price & Cost ---
           accordion_panel(
           "Price & Cost (€/pill)",
           p(class = "text-muted small", "Cost is total marginal cost per pill."),
@@ -78,6 +110,7 @@ ui <- page_navbar(
           sliderInput("cost_range", "Cost range", min = 0, max = 20, value = c(1, 8), step = 0.1)
           ),
           
+          #--- Simulation settings ---
           accordion_panel(
             "Simulation settings",
             h6(class = "text-muted", "Control Monte Carlo sampling."),
@@ -96,18 +129,15 @@ ui <- page_navbar(
       
       # ---- Main content (outputs) ----
       card(
-        card_header("Point estimate (using point inputs)"),
-        h1(textOutput("point_estimate"), class = "display-5"),
-        p(class = "text-muted small",
-          "Revenue = Number of consumers × Frequency x Intensity × Market capture × (Price − Cost)."
-        )
+        card_header("Expected revenue"),
+        h1(textOutput("point_estimate", container = h2), class = "display-5")
       )
     ),
       
       # ---- Simulation results ----
       card(
-        card_header("Simulation results"),
-        plotOutput("revenue_boxplot", height = "420px")
+        card_header("Variation in expected revenue"),
+        plotOutput("revenue_plot", height = "420px")
       )
     )
   ),
@@ -127,6 +157,17 @@ ui <- page_navbar(
 
 server <- function(input, output, session) {
   
+  # Enable/disable frequency inputs based on empirical checkbox
+  observe({
+    if (isTRUE(input$use_empirical)) {
+      shinyjs::disable("freq_point")
+      shinyjs::disable("freq_range")
+    } else {
+      shinyjs::enable("freq_point")
+      shinyjs::enable("freq_range")
+    }
+  })
+  
   # Import empirical frequency 
   party_panel <- read.csv(here::here("data", "Party_Panel.csv"), check.names = FALSE)
   
@@ -137,7 +178,7 @@ server <- function(input, output, session) {
   
   party_panel[] <- lapply(party_panel, function(x) as.numeric(x))
   
-  fr <- with(party_panel, sum(Gebruik * Frequencies, na.rm = TRUE) / sum(Frequencies, na.rm = TRUE))
+  frequency_mean <- with(party_panel, sum(Gebruik * Frequencies, na.rm = TRUE) / sum(Frequencies, na.rm = TRUE))
   
   # Point estimate uses point inputs only
   revenue_point <- reactive({
@@ -145,18 +186,15 @@ server <- function(input, output, session) {
     p    <- input$price_point
     cst  <- input$cost_point
     inten <- input$intensity_mean
+    number_consumers <- input$num_consumers
     
-    # Ensure non-negative and handle price < cost gracefully (can produce negative revenue)
-    mkr <- max(0, min(1, mkr))
-    p   <- max(0, p)
-    cst <- max(0, cst)
-    inten <- max(0, inten)
+    # choose frequency source
+    freq <- if (isTRUE(input$use_empirical)) frequency_mean else input$freq_point
     
-    number_consumers * fr * inten * mkr * (p - cst)
+    number_consumers * freq * inten * mkr * (p - cst)
   })
   
-  output$point_estimate <- renderPrint({
-    # formatted output
+  output$point_estimate <- renderText({
     val <- revenue_point()
     paste0("€ ", format(round(val, 0), big.mark = ","))
   })
@@ -164,8 +202,9 @@ server <- function(input, output, session) {
   # ---- Monte Carlo simulation (reactive) ----
   sim_draws <- reactive({
     
-    n <- as.integer(max(100, min(1e6, input$sim_n %||% 10000)))
-    seed <- as.integer(input$sim_seed %||% 1234)
+    n    <- input$sim_n
+    seed <- input$sim_seed
+    
     
     set.seed(seed)  # we can make this user-set later
     
@@ -188,78 +227,89 @@ server <- function(input, output, session) {
     price     <- runif(n, min = price_lower, max = price_upper)
     cost      <- runif(n, min = cost_lower,  max = cost_upper)
     
-    # Frequency draws from party_panel (first 21 rows)
-    freq <- sample(
-      x       = party_panel$Gebruik[1:21],
-      size    = n,
-      replace = TRUE,
-      prob    = party_panel$Frequencies[1:21]
-    )
+    if (isTRUE(input$use_empirical)) {
+      # empirical sampling (first 21 rows)
+      freq <- sample(
+        x       = party_panel$Gebruik[1:21],
+        size    = n, replace = TRUE,
+        prob    = party_panel$Frequencies[1:21]
+      )
+    } else {
+      # manual uniform range
+      fmin <- max(0, input$freq_range[1])
+      fmax <- max(fmin, input$freq_range[2])
+      freq <- runif(n, min = fmin, max = fmax)
+    }
     
     revenue <- number_consumers * freq * intensity * market * (price - cost)
     revenue
   })
   
-  # ---- Point estimate with frequency mean (reactive, using point inputs) ----
-  revenue_estimate_freq <- reactive({
-    number_consumers * frequency_mean *
-      max(0, input$intensity_mean) *
-      max(0, min(1, input$mkr_point)) *
-      (max(0, input$price_point) - max(0, input$cost_point))
-  })
+  # # ---- Point estimate ----
+  # revenue_estimate_freq <- reactive({
+  #   number_consumers * frequency_mean *
+  #     max(0, input$intensity_mean) *
+  #     max(0, min(1, input$mkr_point)) *
+  #     (max(0, input$price_point) - max(0, input$cost_point))
+  # })
   
-  # ---- Boxplot render ----
-  output$revenue_boxplot <- renderPlot({
+  # ---- Histogram render ----
+  output$revenue_plot <- renderPlot({
     library(ggplot2)
     library(scales)
-    library(ggtext)
     
     revenue <- sim_draws()
-    rev_est <- revenue_estimate_freq()
+    rev_est <- revenue_point()
     
-    # 5th–95th percentile limits
-    y_limits <- quantile(revenue, c(0.05, 0.95), na.rm = TRUE)
+    # Quantiles + point estimate
+    qs <- quantile(revenue, c(0.05, 0.5, 0.95), na.rm = TRUE)
+    ref_lines <- data.frame(
+      type  = c("5th percentile", "Median", "95th percentile", "Point estimate"),
+      value = c(qs[1], qs[2], qs[3], rev_est)
+    )
     
-    ggplot(data.frame(revenue = revenue), aes(x = "", y = revenue)) +
-      geom_boxplot(
-        aes(fill = "Estimated variation in annual revenue (5th–95th percentile)"),
-        width = 0.5, outlier.shape = NA
-      ) +
-      coord_cartesian(ylim = y_limits) +
-      labs(
-        title = "Projected Annual Revenue of a State MDMA Monopoly",
-        x = NULL, y = "Revenue"
-      ) +
-      scale_y_continuous(labels = label_number(prefix = "€", big.mark = ",")) +
-      geom_segment(
-        data = data.frame(y = rev_est),
-        aes(x = 0.75, xend = 1.25, y = rev_est, yend = rev_est,
-            color = "Estimated long-term annual revenue"),
+    # Build a base histogram first to learn the y scale
+    bins <- 60
+    p0 <- ggplot(data.frame(revenue = revenue), aes(x = revenue)) +
+      geom_histogram(bins = bins, alpha = 0.85)
+    
+    gb <- ggplot_build(p0)
+    ymax <- max(gb$data[[1]]$count, na.rm = TRUE)   # histogram's tallest bar
+    seg_frac <- 0.1                                # how tall the markers should be (0–1)
+    below_frac <- 0.04
+    ref_lines$ymin <- -ymax * below_frac
+    ref_lines$ymax <- ymax * seg_frac
+    
+    # Re-draw with capped vertical markers
+    ggplot(data.frame(revenue = revenue), aes(x = revenue)) +
+      geom_histogram(bins = bins, alpha = 0.85) +
+      geom_linerange(
+        data = ref_lines,
+        aes(x = value, ymin = ymin, ymax = ymax, color = type),
         linewidth = 1
       ) +
-      scale_fill_manual(
-        values = c("Estimated variation in annual revenue (5th–95th percentile)" = "grey90"),
-        labels = c(
-          "Estimated variation in annual revenue (5th–95th percentile)" =
-            "Estimated variation in annual revenue <br><span style='color:grey50'>(5th–95th percentile)</span>"
+      scale_color_manual(
+        values = c(
+          "Point estimate"   = "blue",
+          "Median"           = "black",
+          "5th percentile"   = "grey50",
+          "95th percentile"  = "grey50"
         ),
         name = NULL
       ) +
-      scale_color_manual(values = c("Estimated long-term annual revenue" = "blue"), name = NULL) +
-      guides(
-        color = guide_legend(order = 1, override.aes = list(linetype = "solid", linewidth = 1)),
-        fill  = guide_legend(order = 2)
+      labs(
+        title = "Projected Annual Revenue of a State MDMA Monopoly",
+        x = "Revenue", y = "Count"
       ) +
+      scale_x_continuous(labels = label_number(prefix = "€", big.mark = ",")) +
       theme_minimal(base_size = 13) +
       theme(
-        plot.background    = element_rect(fill = "white", color = NA),
-        panel.grid.major.x = element_blank(),
-        axis.text.x        = element_blank(),
-        axis.ticks.x       = element_blank(),
-        legend.position    = "bottom",
-        legend.text        = element_markdown()
+        plot.background = element_rect(fill = "white", color = NA),
+        legend.position = "bottom"
       )
   })
+  
+  
   
   
 }
