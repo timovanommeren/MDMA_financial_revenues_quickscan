@@ -1,7 +1,6 @@
 
 library(shiny)
 library(bslib)
-library(here)
 library(ggplot2)
 library(scales)
 library(shinyjs)
@@ -171,7 +170,7 @@ server <- function(input, output, session) {
   })
   
   # Import empirical frequency 
-  party_panel <- read.csv(here::here("data", "Party_Panel.csv"), check.names = FALSE)
+  party_panel <- read.csv("data/Party_Panel.csv", check.names = FALSE)
   
   # drop the last five rows (your comment says five, not one)
   if (nrow(party_panel) >= 5) {
@@ -206,6 +205,7 @@ server <- function(input, output, session) {
     
     n    <- input$sim_n
     seed <- input$sim_seed
+    number_consumers <- input$num_consumers
     
     
     set.seed(seed)  # we can make this user-set later
