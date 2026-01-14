@@ -39,7 +39,7 @@ ui <- page_navbar(
   
   # ---- PAGE 1: Assumptions ----
   nav_panel(
-    "Assumptions",
+    "Analysis",
     layout_sidebar(
       
       sidebar = sidebar(
@@ -89,8 +89,8 @@ ui <- page_navbar(
           accordion_panel(
           "Intensity",
           p(class = "text-muted small", "Average number of pills per session."),
-          numericInput("intensity_mean", "Mean pills per session (μ)", value = 2, min = 0, step = 0.1),
-          numericInput("intensity_sd",   "Spread (sd)",               value = 0.5, min = 0, step = 0.1),
+          numericInput("intensity_point", "Pills per session", value = 2, min = 0, step = 0.1),
+          sliderInput("intensity_range",   "Range", min = 0, max = 10, value = c(1, 3), step = 0.01),
           ),
           
           #--- Market capture ---
@@ -186,7 +186,7 @@ server <- function(input, output, session) {
     mkr  <- input$mkr_point
     p    <- input$price_point
     cst  <- input$cost_point
-    inten <- input$intensity_mean
+    inten <- input$intensity_point
     number_consumers <- input$num_consumers
     
     # choose frequency source
@@ -210,21 +210,21 @@ server <- function(input, output, session) {
     
     set.seed(seed)  # we can make this user-set later
     
-    # Inputs
-    inten_mean <- max(0, input$intensity_mean)
-    inten_sd   <- max(0, input$intensity_sd)
+    # Inputs 
+    inten_lower <- input$intensity_range[1]
+    inten_upper   <- input$intensity_range[2]
     
-    mkr_lower  <- max(0, min(1, input$mkr_range[1]))
-    mkr_upper  <- max(0, min(1, input$mkr_range[2]))
+    mkr_lower  <- input$mkr_range[1]
+    mkr_upper  <- input$mkr_range[2]
     
     price_lower <- max(0, input$price_range[1])
-    price_upper <- max(price_lower, input$price_range[2])  # ensure upper >= lower
+    price_upper <- max(price_lower, input$price_range[2])  
     
     cost_lower  <- max(0, input$cost_range[1])
     cost_upper  <- max(cost_lower, input$cost_range[2])
     
     # Draws (vectorized)
-    intensity <- rnorm(n, mean = inten_mean, sd = inten_sd)
+    intensity <- runif(n, min = inten_lower, max = inten_upper)
     market    <- runif(n, min = mkr_lower,   max = mkr_upper)
     price     <- runif(n, min = price_lower, max = price_upper)
     cost      <- runif(n, min = cost_lower,  max = cost_upper)
@@ -250,7 +250,7 @@ server <- function(input, output, session) {
   # # ---- Point estimate ----
   # revenue_estimate_freq <- reactive({
   #   number_consumers * frequency_mean *
-  #     max(0, input$intensity_mean) *
+  #     max(0, input$intensity_point) *
   #     max(0, min(1, input$mkr_point)) *
   #     (max(0, input$price_point) - max(0, input$cost_point))
   # })
