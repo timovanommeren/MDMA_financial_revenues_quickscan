@@ -9,10 +9,3 @@ This repository contains the R files used for  calculating the estimate presente
 ## Shiny APP
 
 To re-run the analysis presented in policy report *Counting the Returns: MDMA Regulation Through a Financial Lens* using different estimates, visit the [Estimating MDMA Monopoly Revenues Shiny APP](https://timovanommeren.github.io/MDMA_financial_revenues_quickscan/)
-
-
-## Citation
-
-If you use this analysis, please cite:
-- *Counting the Returns: MDMA Regulation Through a Financial Lens*. 
-- This repository: <https://github.com/timovanommeren/MDMA_financial_revenues_quickscan>.
